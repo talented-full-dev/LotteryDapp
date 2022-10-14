@@ -8,19 +8,23 @@ contract Lottery is RrpRequesterV0, Ownable {
     // Events
     event RequestedRandomNumber(bytes32 indexed requestId);
     event ReceivedRandomNumber(bytes32 indexed requestId, uint256 randomNumber);
+    event SelectedWinnner(bytes32 indexed requestId, string playerName);
 
     // Global Variables
     uint256 public pot = 0; // total amount of ether in the pot
     uint256 public ticketPrice = 0.0001 ether; // price of a single ticket
     uint256 public week = 1; // current week counter
     uint256 public endTime; // datetime that current week ends and lottery is closable
-    uint256 public constant MAX_NUMBER = 10000; // highest possible number
-    address public constant airnodeAddress =
-        0x9d3C147cA16DB954873A498e0af5852AB39139f2;
-    bytes32 public constant endpointId =
-        0xfb6d017bb87991b7495f563db3c8cf59ff87b09781947bb1e417006ad7f55a78;
+    uint256 public constant MAX_NUMBER = 3; // highest possible member count
+    address public constant airnodeAddress = 0x9d3C147cA16DB954873A498e0af5852AB39139f2;
+    bytes32 public constant endpointId = 0xfb6d017bb87991b7495f563db3c8cf59ff87b09781947bb1e417006ad7f55a78;
     address payable public sponsorWallet;
 
+     struct Player {
+        string playerName;
+        address playerAddr;
+    }
+    Player[] public players;
     // Errors
     error EndTimeReached(uint256 lotteryEndTime);
 
@@ -47,7 +51,8 @@ contract Lottery is RrpRequesterV0, Ownable {
 
     /// @notice Buy a ticket for the current week
     /// @param _number The participant's chosen lottery number for which they're buying a ticket
-    function enter(uint256 _number) external payable {
+    function enter(uint256 _number, string memory _playerName, address _playerAddr) external payable {
+        uint id = players.push(Player(_playerName, _playerAddr)) - 1;
         require(_number <= MAX_NUMBER, "Number must be 1-MAX_NUMBER"); // guess has to be between 1 and MAX_NUMBER
         if (block.timestamp >= endTime) revert EndTimeReached(endTime); // lottery has to be open
         require(msg.value == ticketPrice, "Ticket price is 0.0001 ether"); // user needs to send 0.0001 ether with the transaction
@@ -96,11 +101,13 @@ contract Lottery is RrpRequesterV0, Ownable {
         address[] memory winners = tickets[week][_randomNumber];
         week++;
         endTime += 7 days;
-        if (winners.length > 0) {
+       if (winners.length > 0) {
             uint256 earnings = pot / winners.length;
             pot = 0;
             for (uint256 i = 0; i < winners.length; i++) {
-                payable(winners[i]).call{value: earnings}(""); // send earnings to each winner
+                if(i == _randomNumber){
+                     payable(winners[i]).call{value: earnings}(""); // send earnings to each winner
+                }
             }
         }
     }
